@@ -83,27 +83,41 @@ namespace SeTuDetectorCore
                 var evt = session.PullEvent();
                 if (evt is GroupMessageEventArgs args)
                 {
+                    if (args.Message.OfType<Plain>().Any(m => m.Text.Contains("/mute")))
+                    {
+                        var group = args.Group.Identifier;
+                        SeTuTaskManager.BlockedGroups.Add(group);
+                        File.AppendAllText("blocked", group);
+                    }
+
                     var force = args.Message.OfType<Plain>().Any(m => m.Text.Contains("/色图检测"));
 
                     foreach (var component in args.Message)
                     {
                         if (component is Image image)
                         {
-                            using var result = image.OpenReadAsync().Result;
-                            var tempfilename = Guid.NewGuid().ToString("D");
-                            var temppath = Path.Combine("pending check", tempfilename);
-                            Stream s = File.Create(temppath);
+                            try
+                            {
+                                using var result = image.OpenReadAsync().Result;
+                                var tempfilename = Guid.NewGuid().ToString("D");
+                                var temppath = Path.Combine("pending check", tempfilename);
+                                Stream s = File.Create(temppath);
 
-                            result.CopyTo(s);
-                            // 写重复检测
-                            s.Close();
-                            
-                            var filename = File.ReadAllBytes(temppath).MD5().ToHexString();
-                            var realpath = Path.Combine("pending check", filename);
-                            if (File.Exists(realpath) && !force) continue;
-                            
-                            File.Move(temppath, realpath, true);
-                            SeTuTaskManager.AddTask(filename, args.Group, force);
+                                result.CopyTo(s);
+                                // 写重复检测
+                                s.Close();
+
+                                var filename = File.ReadAllBytes(temppath).MD5().ToHexString();
+                                var realpath = Path.Combine("pending check", filename);
+                                if (File.Exists(realpath) && !force) continue;
+
+                                File.Move(temppath, realpath, true);
+                                SeTuTaskManager.AddTask(filename, args.Group, force);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine(e);
+                            }
                         }
                     }
                 }

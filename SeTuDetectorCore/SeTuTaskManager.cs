@@ -24,6 +24,7 @@ namespace SeTuDetectorCore
         public Group Group;
         public string FileName;
         public bool Force;
+        public string Extension;
 
 
         public bool Equals(SeTuTask other)
@@ -46,6 +47,7 @@ namespace SeTuDetectorCore
         private static HashSet<SeTuTask> taskQueue = new HashSet<SeTuTask>();
         private static DateTime lastSendTime = DateTime.MinValue;
         private static bool silence = false;
+        public static List<string> BlockedGroups = new List<string>();
 
         private static void SendMessage(Group group, MessageChain msg)
         {
@@ -61,15 +63,18 @@ namespace SeTuDetectorCore
             }
             else
             {
-                if (delta < TimeSpan.FromSeconds(5))
+                if (delta < TimeSpan.FromSeconds(3))
                 {
-                    silence = true;
-                    SendMessageInternal(group, new MessageChain(new[] { new Plain("检测到可能会发送消息速度太快, 在一段时间内会停止消息发送."), }));
+                    //silence = true;
+                    //SendMessageInternal(group, new MessageChain(new[] { new Plain("检测到可能会发送消息速度太快, 在一段时间内会停止消息发送."), }));
                     return;
                 }
             }
 
+            if (BlockedGroups.Contains(group.Identifier)) return;
+            
             lastSendTime = DateTime.Now;
+            
             SendMessageInternal(group, msg);
 
 
@@ -118,12 +123,14 @@ namespace SeTuDetectorCore
                 }
                 else
                 {
+                    var random = new Random().Next(10) < 4 ? "如果你觉得太吵 可以使用/mute来在这个群永久关闭所有消息" : "";
                     var likes = tags_like.Intersect(result.Tags.Select(t => t.TagName)).ToArray();
                     if (likes.Length == 0) return;
                     var msg =
                         (from like in likes select Enum.Parse<TagsLike>(like) into tag select GetChinese(tag)).Connect();
                     SendMessage(task.Group,
-                        new MessageChain(new MessageComponent[] { new At(775942303), new Plain($"检测到爷爷您最爱的 {msg} 色图!") }));
+                        new MessageChain(new MessageComponent[] { new At(775942303), new Plain($"检测到了 {msg} 色图!" + random) }));
+                    File.Move(path, Path.Combine("setu", result.FilePath + task.Extension));
                 }
                 
             }
@@ -171,7 +178,7 @@ namespace SeTuDetectorCore
             var extension = GetExtension(path);
             if (extension is null) return;
 
-            taskQueue.Add(new SeTuTask{FileName = filename, Group = group, Force = force});
+            taskQueue.Add(new SeTuTask{FileName = filename, Group = group, Force = force, Extension = extension});
             Program.process.Suspend();
             File.Copy(path, "D:\\WARNING-DELETE-IF-FILE-IN\\" + filename + extension);
             Program.process.Resume();
