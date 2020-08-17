@@ -111,7 +111,14 @@ namespace SeTuDetectorCore
                                 var realpath = Path.Combine("pending check", filename);
                                 if (File.Exists(realpath) && !force) continue;
 
-                                File.Move(temppath, realpath, true);
+                                // 我不管了 反正就是要被占用 加个try完事
+                                try
+                                {
+                                    File.Move(temppath, realpath, true);
+                                }
+                                catch (Exception)
+                                {
+                                }
                                 SeTuTaskManager.AddTask(filename, args.Group, force);
                             }
                             catch (Exception e)

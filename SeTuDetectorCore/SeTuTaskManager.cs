@@ -130,7 +130,7 @@ namespace SeTuDetectorCore
                         (from like in likes select Enum.Parse<TagsLike>(like) into tag select GetChinese(tag)).Connect();
                     SendMessage(task.Group,
                         new MessageChain(new MessageComponent[] { new At(775942303), new Plain($"检测到了 {msg} 色图!" + random) }));
-                    File.Move(path, Path.Combine("setu", result.FilePath + task.Extension));
+                    File.Copy(path, Path.Combine("setu", result.FilePath + task.Extension));
                 }
                 
             }
@@ -149,7 +149,11 @@ namespace SeTuDetectorCore
             pink_hair,
             breasts,
             pantyhose,
-            panties
+            panties,
+            black_legwear,
+            cat_ears,
+            bare_shoulders,
+            //collarbone
         }
 
         public static string GetChinese(TagsLike tag)
@@ -168,6 +172,10 @@ namespace SeTuDetectorCore
                 TagsLike.breasts => "奶子",
                 TagsLike.pantyhose => "裤袜",
                 TagsLike.panties => "胖次",
+                TagsLike.black_legwear => "黑丝",
+                TagsLike.cat_ears => "猫耳",
+                TagsLike.bare_shoulders => "裸肩",
+                //TagsLike.collarbone => "锁骨",
                 _ => throw new ArgumentOutOfRangeException(nameof(tag), tag, null)
             };
         }
