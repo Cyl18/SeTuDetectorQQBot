@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ac682.Hyperai.Clients.Mirai" Version="2020.8.6" />
+    <PackageReference Include="GammaLibrary" Version="1.2.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SeTuDetectorML.Model\SeTuDetectorML.Model.csproj" />
+  </ItemGroup>
+
+</Project>
