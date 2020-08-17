@@ -83,6 +83,8 @@ namespace SeTuDetectorCore
                 var evt = session.PullEvent();
                 if (evt is GroupMessageEventArgs args)
                 {
+                    var force = args.Message.OfType<Plain>().Any(m => m.Text.Contains("/色图检测"));
+
                     foreach (var component in args.Message)
                     {
                         if (component is Image image)
@@ -98,10 +100,10 @@ namespace SeTuDetectorCore
                             
                             var filename = File.ReadAllBytes(temppath).MD5().ToHexString();
                             var realpath = Path.Combine("pending check", filename);
-                            if (File.Exists(realpath)) continue;
+                            if (File.Exists(realpath) && !force) continue;
                             
-                            File.Move(temppath, realpath);
-                            SeTuTaskManager.AddTask(filename, args.Group);
+                            File.Move(temppath, realpath, true);
+                            SeTuTaskManager.AddTask(filename, args.Group, force);
                         }
                     }
                 }

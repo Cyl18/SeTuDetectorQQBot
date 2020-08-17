@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using GammaLibrary.Extensions;
 using Hyperai.Messages;
 using Hyperai.Messages.ConcreteModels;
@@ -22,6 +23,7 @@ namespace SeTuDetectorCore
     {
         public Group Group;
         public string FileName;
+        public bool Force;
 
 
         public bool Equals(SeTuTask other)
@@ -42,6 +44,41 @@ namespace SeTuDetectorCore
     public class SeTuTaskManager
     {
         private static HashSet<SeTuTask> taskQueue = new HashSet<SeTuTask>();
+        private static DateTime lastSendTime = DateTime.MinValue;
+        private static bool silence = false;
+
+        private static void SendMessage(Group group, MessageChain msg)
+        {
+            var delta = DateTime.Now - lastSendTime;
+            if (silence)
+            {
+                if (delta < TimeSpan.FromSeconds(30))
+                {
+                    return;
+                }
+
+                silence = false;
+            }
+            else
+            {
+                if (delta < TimeSpan.FromSeconds(5))
+                {
+                    silence = true;
+                    SendMessageInternal(group, new MessageChain(new[] { new Plain("检测到可能会发送消息速度太快, 在一段时间内会停止消息发送."), }));
+                    return;
+                }
+            }
+
+            lastSendTime = DateTime.Now;
+            SendMessageInternal(group, msg);
+
+
+
+            void SendMessageInternal(Group g, MessageChain messageChain)
+            {
+                Program.MiraiHttpSession.SendGroupMessageAsync(g, messageChain).Wait();
+            }
+        }
 
         public static void ReportTask(Program.FileResult result)
         {
@@ -63,15 +100,32 @@ namespace SeTuDetectorCore
             };
             var predictionResult = ConsumeModel.Predict(sampleData);
             var tags_like = Enum.GetNames(typeof(TagsLike));
-            if (predictionResult.Prediction == "二次元色图")
+            if (predictionResult.Prediction == "二次元色图" || task.Force)
             {
-                var likes = tags_like.Intersect(result.Tags.Select(t => t.TagName)).ToArray();
-                if (likes.Length == 0) return;
-                var msg =
-                    (from like in likes select Enum.Parse<TagsLike>(like) into tag select GetChinese(tag)).Connect();
+                if (task.Force)
+                {
+                    var tags = result.Tags.Select(t => t.TagName).ToArray();
+                    for (var i = 0; i < tags.Length; i++)
+                    {
+                        var tagstr = tags[i];
+                        if (Enum.TryParse<TagsLike>(tagstr, out var tag))
+                        {
+                            tags[i] = GetChinese(tag);
+                        }
 
-                Program.MiraiHttpSession.SendGroupMessageAsync(task.Group,
-                    new MessageChain(new MessageComponent[] {new At(775942303), new Plain($"检测到爷爷您最爱的 {msg} 色图!")}));
+                    }
+                    SendMessage(task.Group, MessageChain.Construct(new Plain($"检测到含有以下元素: {tags.Connect()}, 模型匹配为{predictionResult.Prediction} (完全不准确)")));
+                }
+                else
+                {
+                    var likes = tags_like.Intersect(result.Tags.Select(t => t.TagName)).ToArray();
+                    if (likes.Length == 0) return;
+                    var msg =
+                        (from like in likes select Enum.Parse<TagsLike>(like) into tag select GetChinese(tag)).Connect();
+                    SendMessage(task.Group,
+                        new MessageChain(new MessageComponent[] { new At(775942303), new Plain($"检测到爷爷您最爱的 {msg} 色图!") }));
+                }
+                
             }
         }
 
@@ -84,7 +138,11 @@ namespace SeTuDetectorCore
             animal_ears,
             silver_hair,
             white_hair,
-
+            blonde_hair,
+            pink_hair,
+            breasts,
+            pantyhose,
+            panties
         }
 
         public static string GetChinese(TagsLike tag)
@@ -98,17 +156,22 @@ namespace SeTuDetectorCore
                 TagsLike.animal_ears => "兽耳",
                 TagsLike.silver_hair => "银发",
                 TagsLike.white_hair => "白毛",
+                TagsLike.blonde_hair => "银发",
+                TagsLike.pink_hair => "粉毛",
+                TagsLike.breasts => "奶子",
+                TagsLike.pantyhose => "裤袜",
+                TagsLike.panties => "胖次",
                 _ => throw new ArgumentOutOfRangeException(nameof(tag), tag, null)
             };
         }
 
-        public static void AddTask(string filename, Group group)
+        public static void AddTask(string filename, Group @group, bool force)
         {
             var path = Path.Combine("pending check", filename);
             var extension = GetExtension(path);
             if (extension is null) return;
 
-            taskQueue.Add(new SeTuTask{FileName = filename, Group = group});
+            taskQueue.Add(new SeTuTask{FileName = filename, Group = group, Force = force});
             Program.process.Suspend();
             File.Copy(path, "D:\\WARNING-DELETE-IF-FILE-IN\\" + filename + extension);
             Program.process.Resume();
